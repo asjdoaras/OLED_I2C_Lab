@@ -1,0 +1,154 @@
+#include "oled.h"
+#include "i2c.h"
+// OLED I2C??,?????0x7A
+#define OLED_ADDR 0x78
+
+// 8×16???? 0~9,??,????
+const uint8_t F8X16[10][16] =
+{
+{0x00,0x00,0x7F,0xFF,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x7F,0xFF,0x00,0x00},//0
+{0x00,0x00,0x00,0x02,0x00,0x02,0x7F,0xFF,0x00,0x02,0x00,0x02,0x00,0x02,0x00,0x00},//1
+{0x00,0x00,0x7F,0xFF,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x00,0x00},//2
+{0x00,0x00,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x7F,0xFF,0x00,0x00},//3
+{0x00,0x00,0x0F,0xF0,0x08,0x10,0x08,0x10,0x08,0x10,0x08,0x10,0x7F,0xFF,0x00,0x00},//4
+{0x00,0x00,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x3F,0xFC,0x00,0x00},//5
+{0x00,0x00,0x7F,0xFF,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x3F,0xFC,0x00,0x00},//6
+{0x00,0x00,0x00,0x02,0x00,0x02,0x00,0x02,0x00,0x02,0x00,0x02,0x7F,0xFF,0x00,0x00},//7
+{0x00,0x00,0x7F,0xFF,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x7F,0xFF,0x00,0x00},//8
+{0x00,0x00,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x40,0x02,0x7F,0xFF,0x00,0x00},//9
+};
+
+// I2C???
+void OLED_Write_Cmd(uint8_t cmd)
+{
+  uint8_t buf[2] = {0x00, cmd};
+  HAL_I2C_Master_Transmit(&hi2c1, OLED_ADDR, buf, 2, 100);
+}
+
+// I2C???????
+void OLED_Write_Data(uint8_t data)
+{
+  uint8_t buf[2] = {0x40, data};
+  HAL_I2C_Master_Transmit(&hi2c1, OLED_ADDR, buf, 2, 100);
+}
+
+// SSD1306???????
+void OLED_Init(void)
+{
+  HAL_Delay(100);
+  OLED_Write_Cmd(0xAE); //????
+  OLED_Write_Cmd(0xD5);
+  OLED_Write_Cmd(0x80);
+  OLED_Write_Cmd(0xA8);
+  OLED_Write_Cmd(0x3F);
+  OLED_Write_Cmd(0xD3);
+  OLED_Write_Cmd(0x00);
+  OLED_Write_Cmd(0x40);
+  OLED_Write_Cmd(0xA1);
+  OLED_Write_Cmd(0xC8);
+  OLED_Write_Cmd(0xDA);
+  OLED_Write_Cmd(0x12);
+  OLED_Write_Cmd(0x81);
+  OLED_Write_Cmd(0xCF);
+  OLED_Write_Cmd(0xD9);
+  OLED_Write_Cmd(0xF1);
+  OLED_Write_Cmd(0xDB);
+  OLED_Write_Cmd(0x30);
+  OLED_Write_Cmd(0xA4);
+  OLED_Write_Cmd(0xA6);
+  OLED_Write_Cmd(0xAF); //????
+  OLED_Clear();
+}
+
+// ????:x(0~127), page(0~7),??8???
+void OLED_Set_Pos(uint8_t x, uint8_t page)
+{
+  OLED_Write_Cmd(0xb0 + page);
+  OLED_Write_Cmd(((x & 0xf0) >> 4) | 0x10);
+  OLED_Write_Cmd(x & 0x0f);
+}
+
+// ????
+void OLED_Clear(void)
+{
+  uint8_t page,i;
+  for(page=0;page<8;page++)
+  {
+    OLED_Set_Pos(0,page);
+    for(i=0;i<128;i++)
+    {
+      OLED_Write_Data(0x00);
+    }
+  }
+}
+
+// ??16*16??,?????2?page,32??
+void OLED_ShowChinese(uint8_t x,uint8_t page,const uint8_t *ch)
+{
+  uint8_t i;
+  OLED_Set_Pos(x, page);
+  for(i=0;i<16;i++) OLED_Write_Data(ch[i]);
+  OLED_Set_Pos(x, page+1);
+  for(i=0;i<16;i++) OLED_Write_Data(ch[i+16]);
+}
+
+// ????8*16??
+void OLED_Show8x16Num(uint8_t x,uint8_t page,uint8_t num)
+{
+  uint8_t i;
+  OLED_Set_Pos(x, page);
+  for(i=0;i<16;i++)
+  {
+    OLED_Write_Data(F8X16[num][i]);
+  }
+}
+void OLED_ShowChar(uint8_t x,uint8_t page,uint8_t ch,uint8_t size,uint8_t mode)
+{
+	uint8_t c=0,i=0;
+	ch=ch-' ';
+	if(ch>95)return;
+	OLED_Set_Pos(x,page);
+	for(i=0;i<8;i++)
+	{
+		if(mode) OLED_Write_Data(F8X16[ch*16+i]);
+		else OLED_Write_Data(~F8X16[ch*16+i]);
+	}
+	OLED_Set_Pos(x,page+1);
+	for(i=0;i<8;i++)
+	{
+		if(mode) OLED_Write_Data(F8X16[ch*16+i+8]);
+		else OLED_Write_Data(~F8X16[ch*16+i+8]);
+	}
+}
+
+void OLED_ShowString(uint8_t x,uint8_t page,uint8_t *str,uint8_t size)
+{
+	while(*str)
+	{
+		if(x>120){x=0;page+=2;}
+		if(page>7) {page=0;x=0;OLED_Clear();}
+		OLED_ShowChar(x,page,*str,size,1);
+		x+=8;
+		str++;
+	}
+}
+
+void OLED_ShowNum(uint8_t x,uint8_t page,uint32_t num,uint8_t len,uint8_t size)
+{
+	uint8_t t,temp;
+	uint8_t enshow=0;
+	for(t=0;t<len;t++)
+	{
+		temp=(num/pow(10,len-t-1))%10;
+		if(enshow==0 && t<(len-1))
+		{
+			if(temp==0)
+			{
+				OLED_ShowChar(x+(size/2)*t,page,' ',size,1);
+				continue;
+			}
+			else enshow=1;
+		}
+		OLED_ShowChar(x+(size/2)*t,page,temp+'0',size,1);
+	}
+}
